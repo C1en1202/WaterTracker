@@ -72,6 +72,31 @@ namespace WaterTracker
             }
         }
 
+        private void DeleteSaveData()
+        {
+            try
+            {
+                if (File.Exists(savePath))
+                {
+                    File.Delete(savePath);
+                    currentVolume = 0;
+                    bottleNumber = 1;
+                    UpdateWaterLevel();
+                    var statusLabel = this.Controls.OfType<Label>().First();
+                    statusLabel.Text = $"当前水瓶: {bottleNumber} | 当前水量: {currentVolume}ml / {MaxVolume}ml";
+                    MessageBox.Show("存档已删除");
+                }
+                else
+                {
+                    MessageBox.Show("没有找到存档文件");
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("删除存档失败: " + ex.Message);
+            }
+        }
+
         private void SaveData()
         {
             try
@@ -192,6 +217,17 @@ namespace WaterTracker
                 DrinkButton_Click(amount);
             };
 
+            // 创建删除存档按钮
+            var deleteSaveButton = new Button
+            {
+                Parent = this,
+                Text = "删除存档",
+                Size = new Size(100, 40),
+                Location = new Point(290, 500),
+                Font = new Font("微软雅黑", 10, FontStyle.Bold)
+            };
+            deleteSaveButton.Click += (s, e) => DeleteSaveData();
+
             // 创建显示标签
             var statusLabel = new Label
             {
@@ -214,6 +250,16 @@ namespace WaterTracker
             ToolStripMenuItem exitItem = new ToolStripMenuItem("退出");
             exitItem.Click += new EventHandler(ExitToolStripMenuItem_Click);
             contextMenu.Items.Add(exitItem);
+
+            // 添加存档删除菜单项
+            ToolStripMenuItem deleteSaveItem = new ToolStripMenuItem("删除存档");
+            deleteSaveItem.Click += (s, e) => DeleteSaveData();
+            contextMenu.Items.Add(deleteSaveItem);
+
+            // 添加300ml快速喝水菜单项
+            ToolStripMenuItem quickDrinkItem = new ToolStripMenuItem("快速喝水(300ml)");
+            quickDrinkItem.Click += (s, e) => DrinkButton_Click(300);
+            contextMenu.Items.Add(quickDrinkItem);
 
             // 配置系统通知图标属性
 

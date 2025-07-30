@@ -19,7 +19,7 @@ namespace WaterTracker
     public partial class Form1 : Form
     {
         private int currentVolume = 0;
-        private int bottleNumber = 1;
+        private int bottleNumber = 1; // 水瓶计数从1开始
         private const int MaxVolume = 3000;
 
         private Panel? waterPanel = null;
@@ -65,7 +65,7 @@ namespace WaterTracker
                     if (data != null)
                     {
                         currentVolume = data.CurrentVolume;
-                        bottleNumber = data.BottleNumber;
+                        bottleNumber = data.BottleNumber > 0 ? data.BottleNumber : 1;
                     }
                 }
                 catch {}
@@ -245,7 +245,7 @@ namespace WaterTracker
                 int excess = newVolume - MaxVolume;
                 currentVolume = excess;
                 bottleNumber++;
-                MessageBox.Show($"水瓶 {bottleNumber - 1} 已喝完！开始新的水瓶，继承 {excess}ml。");
+                MessageBox.Show($"水瓶 {bottleNumber - 1} 已喝完！开始新的水瓶 {bottleNumber}，继承 {excess}ml。");
             }
             else
             {

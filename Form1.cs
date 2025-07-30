@@ -146,7 +146,7 @@ namespace WaterTracker
             if (DateTime.Now.Minute == 0 && DateTime.Now.Second < 10)
             {
                 // 发送系统通知
-                notifyIcon?.ShowBalloonTip(10000,
+                notifyIcon?.ShowBalloonTip(15000,
                     "喝水提醒",
                     $"到{DateTime.Now.Hour}点啦,请喝水!",
                     ToolTipIcon.Info);
@@ -247,19 +247,19 @@ namespace WaterTracker
             openItem.Click += new EventHandler(OpenWaterTracker_Click);
             contextMenu.Items.Add(openItem);
 
-            ToolStripMenuItem exitItem = new ToolStripMenuItem("退出");
-            exitItem.Click += new EventHandler(ExitToolStripMenuItem_Click);
-            contextMenu.Items.Add(exitItem);
+            // 添加300ml快速喝水菜单项
+            ToolStripMenuItem quickDrinkItem = new ToolStripMenuItem("快速喝水(300ml)");
+            quickDrinkItem.Click += (s, e) => DrinkButton_Click(300);
+            contextMenu.Items.Add(quickDrinkItem);
 
             // 添加存档删除菜单项
             ToolStripMenuItem deleteSaveItem = new ToolStripMenuItem("删除存档");
             deleteSaveItem.Click += (s, e) => DeleteSaveData();
             contextMenu.Items.Add(deleteSaveItem);
 
-            // 添加300ml快速喝水菜单项
-            ToolStripMenuItem quickDrinkItem = new ToolStripMenuItem("快速喝水(300ml)");
-            quickDrinkItem.Click += (s, e) => DrinkButton_Click(300);
-            contextMenu.Items.Add(quickDrinkItem);
+            ToolStripMenuItem exitItem = new ToolStripMenuItem("退出");
+            exitItem.Click += new EventHandler(ExitToolStripMenuItem_Click);
+            contextMenu.Items.Add(exitItem);
 
             // 配置系统通知图标属性
 

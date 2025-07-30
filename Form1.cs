@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using Microsoft.Win32;
 using System.IO;
 using System.Text.Json;
 using WinFormsTimer = System.Windows.Forms.Timer;
@@ -23,6 +24,7 @@ namespace WaterTracker
         private const int MaxVolume = 3000;
         private bool _allowClose = false;
         private Button? drinkButton;
+        private Button? startupButton;
         private Label? statusLabel;
 
         private Panel? waterPanel = null;
@@ -169,6 +171,41 @@ namespace WaterTracker
             }
         }
 
+        private bool IsStartupEnabled()
+        {
+            using (RegistryKey? key = Registry.CurrentUser.OpenSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Run"))
+            {
+                if (key == null) return false;
+                string? value = key!.GetValue("WaterTracker") as string;
+                return value != null;
+            }
+        }
+
+        private void ToggleStartup()
+        {
+            using (RegistryKey? key = Registry.CurrentUser.OpenSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Run", true))
+            {
+                if (key == null) return;
+                
+                if (IsStartupEnabled())
+                {
+                    key!.DeleteValue("WaterTracker");
+                    MessageBox.Show("已禁用开机自启动", "提示");
+                }
+                else
+                {
+                    string appPath = Application.ExecutablePath;
+                    key!.SetValue("WaterTracker", appPath);
+                    MessageBox.Show("已启用开机自启动", "提示");
+                }
+                // 更新按钮文本
+                if (startupButton != null)
+                {
+                    startupButton.Text = IsStartupEnabled() ? "禁用开机自启" : "启用开机自启";
+                }
+            }
+        }
+
         private void CheckAndSendNotification()
         {
             // 检查是否为整点
@@ -245,6 +282,17 @@ namespace WaterTracker
                 int amount = int.TryParse(amountTextBox.Text, out int num) && num > 0 ? num : 300;
                 DrinkButton_Click(amount);
             };
+
+            // 创建开机自启动按钮
+            startupButton = new Button
+            {
+                Parent = this,
+                Text = IsStartupEnabled() ? "禁用开机自启" : "启用开机自启",
+                Size = new Size(120, 30),
+                Location = new Point(140, 550),
+                Font = new Font("微软雅黑", 9)
+            };
+            startupButton.Click += (s, e) => ToggleStartup();
 
             // 创建删除存档按钮
             var deleteSaveButton = new Button

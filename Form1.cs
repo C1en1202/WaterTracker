@@ -21,6 +21,8 @@ namespace WaterTracker
         private int currentVolume = 0;
         private int bottleNumber = 1; // 水瓶计数从1开始
         private const int MaxVolume = 3000;
+        private Button? drinkButton;
+        private Label? statusLabel;
 
         private Panel? waterPanel = null;
         private string savePath = Path.Combine(AppContext.BaseDirectory, "water.json");
@@ -41,7 +43,9 @@ namespace WaterTracker
               try
               {
                   LoadData();
-                  InitializeUI();
+            InitializeUI();
+            UpdateDrinkButtonText();
+            UpdateStatusLabel();
               }
               catch (Exception ex)
               {
@@ -65,8 +69,10 @@ namespace WaterTracker
                     if (data != null)
                     {
                         currentVolume = data.CurrentVolume;
-                        bottleNumber = data.BottleNumber > 0 ? data.BottleNumber : 1;
-                    }
+                    bottleNumber = data.BottleNumber > 0 ? data.BottleNumber : 1;
+                }
+                UpdateStatusLabel();
+                UpdateDrinkButtonText();
                 }
                 catch {}
             }
@@ -82,6 +88,8 @@ namespace WaterTracker
                     currentVolume = 0;
                     bottleNumber = 1;
                     UpdateWaterLevel();
+                    UpdateStatusLabel();
+                    UpdateDrinkButtonText();
                     var statusLabel = this.Controls.OfType<Label>().First();
                     statusLabel.Text = $"当前水瓶: {bottleNumber} | 当前水量: {currentVolume}ml / {MaxVolume}ml";
                     MessageBox.Show("存档已删除");
@@ -138,6 +146,22 @@ namespace WaterTracker
         private void HourlyTimer_Tick(object? sender, EventArgs e)
         {
             CheckAndSendNotification();
+        }
+
+        private void UpdateDrinkButtonText()
+        {
+            if (drinkButton != null)
+            {
+                drinkButton.Text = currentVolume >= MaxVolume ? "下一个水瓶" : "喝一次水";
+            }
+        }
+
+        private void UpdateStatusLabel()
+        {
+            if (statusLabel != null)
+            {
+                statusLabel.Text = $"当前水瓶: {bottleNumber} | 当前水量: {currentVolume}ml / {MaxVolume}ml";
+            }
         }
 
         private void CheckAndSendNotification()
@@ -203,7 +227,7 @@ namespace WaterTracker
             };
 
             // 创建喝水按钮
-            var drinkButton = new Button
+            drinkButton = new Button
             {
                 Parent = this,
                 Text = "喝一次水",
@@ -229,7 +253,7 @@ namespace WaterTracker
             deleteSaveButton.Click += (s, e) => DeleteSaveData();
 
             // 创建显示标签
-            var statusLabel = new Label
+            statusLabel = new Label
             {
                 Parent = this,
                 Text = $"当前水瓶: {bottleNumber} | 当前水量: {currentVolume}ml / {MaxVolume}ml",
@@ -283,25 +307,25 @@ namespace WaterTracker
 
         private void DrinkButton_Click(int amount)
         {
-            int newVolume = currentVolume + amount;
-            System.Diagnostics.Debug.WriteLine($"DrinkButton_Click: currentVolume={currentVolume}, amount={amount}, newVolume={newVolume}");
-            // 检查是否超过水瓶容量
-            if (newVolume > MaxVolume)
+            if (currentVolume >= MaxVolume)
             {
-                int excess = newVolume - MaxVolume;
-                currentVolume = excess;
+                // 进入下一个水瓶
+                currentVolume = 0;
                 bottleNumber++;
-                MessageBox.Show($"水瓶 {bottleNumber - 1} 已喝完！开始新的水瓶 {bottleNumber}，继承 {excess}ml。");
-            }
-            else
-            {
-                currentVolume = newVolume;
+                UpdateDrinkButtonText();
+                UpdateWaterLevel();
+                UpdateStatusLabel();
+                SaveData();
+                return;
             }
 
-            // 更新水面板高度和状态标签
+            int newVolume = currentVolume + amount;
+            currentVolume = Math.Min(newVolume, MaxVolume);
+            
             UpdateWaterLevel();
-            var statusLabel = this.Controls.OfType<Label>().First();
-            statusLabel.Text = $"当前水瓶: {bottleNumber} | 当前水量: {currentVolume}ml / {MaxVolume}ml";
+            UpdateStatusLabel();
+            UpdateDrinkButtonText();
+            SaveData();
         }
 
         private void UpdateWaterLevel()

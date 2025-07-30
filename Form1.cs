@@ -228,7 +228,7 @@ namespace WaterTracker
         {
             // 设置窗口属性
             this.Text = "DrinkWater";
-            this.Size = new Size(400, 600);
+            this.Size = new Size(500, 700);
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
 
@@ -253,28 +253,31 @@ namespace WaterTracker
                 Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right
             };
 
+            // 创建第一行容器
+            var firstRowPanel = new Panel
+            {
+                Parent = this,
+                Size = new Size(300, 40),
+                Location = new Point((this.Width - 300) / 2, 500)
+            };
+
             // 创建喝水量输入框
             var amountTextBox = new TextBox
             {
-                Parent = this,
+                Parent = firstRowPanel,
                 Text = "300",
-                Size = new Size(60, 25),
-                Location = new Point(100, 505),
+                Size = new Size(80, 35),
+                Location = new Point(0, 0),
                 Font = new Font("微软雅黑", 10)
-            };
-            amountTextBox.KeyPress += (s, e) =>
-            {
-                if (!char.IsDigit(e.KeyChar) && e.KeyChar != (char)Keys.Back)
-                    e.Handled = true;
             };
 
             // 创建喝水按钮
             drinkButton = new Button
             {
-                Parent = this,
+                Parent = firstRowPanel,
                 Text = "喝一次水",
-                Size = new Size(100, 40),
-                Location = new Point(180, 500),
+                Size = new Size(120, 35),
+                Location = new Point(180, 0),
                 Font = new Font("微软雅黑", 10, FontStyle.Bold)
             };
             drinkButton.Click += (s, e) =>
@@ -283,27 +286,40 @@ namespace WaterTracker
                 DrinkButton_Click(amount);
             };
 
-            // 创建开机自启动按钮
-            startupButton = new Button
+            // 创建第二行容器
+            var secondRowPanel = new Panel
             {
                 Parent = this,
-                Text = IsStartupEnabled() ? "禁用开机自启" : "启用开机自启",
-                Size = new Size(120, 30),
-                Location = new Point(140, 550),
-                Font = new Font("微软雅黑", 9)
+                Size = new Size(300, 40),
+                Location = new Point((this.Width - 300) / 2, 550)
             };
-            startupButton.Click += (s, e) => ToggleStartup();
+            amountTextBox.KeyPress += (s, e) =>
+            {
+                if (!char.IsDigit(e.KeyChar) && e.KeyChar != (char)Keys.Back)
+                    e.Handled = true;
+            };
 
             // 创建删除存档按钮
             var deleteSaveButton = new Button
             {
-                Parent = this,
+                Parent = secondRowPanel,
                 Text = "删除存档",
-                Size = new Size(100, 40),
-                Location = new Point(290, 500),
-                Font = new Font("微软雅黑", 10, FontStyle.Bold)
+                Size = new Size(140, 35),
+                Location = new Point(0, 0),
+                Font = new Font("微软雅黑", 10)
             };
             deleteSaveButton.Click += (s, e) => DeleteSaveData();
+
+            // 创建开机自启动按钮
+            startupButton = new Button
+            {
+                Parent = secondRowPanel,
+                Text = IsStartupEnabled() ? "禁用开机自启" : "启用开机自启",
+                Size = new Size(140, 35),
+                Location = new Point(160, 0),
+                Font = new Font("微软雅黑", 10)
+            };
+            startupButton.Click += (s, e) => ToggleStartup();
 
             // 创建显示标签
             statusLabel = new Label

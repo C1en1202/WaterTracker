@@ -237,7 +237,7 @@ namespace WaterTracker
             {
                 Parent = this,
                 Size = new Size(200, 400),
-                Location = new Point(90, 50),
+                Location = new Point((this.Width - 200) / 2, 50),
                 BorderStyle = BorderStyle.FixedSingle,
                 BackColor = Color.LightGray
             };

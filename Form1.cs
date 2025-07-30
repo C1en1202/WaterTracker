@@ -320,7 +320,16 @@ namespace WaterTracker
             }
 
             int newVolume = currentVolume + amount;
-            currentVolume = Math.Min(newVolume, MaxVolume);
+            if (newVolume > MaxVolume)
+            {
+                int excess = newVolume - MaxVolume;
+                currentVolume = excess;
+                bottleNumber++;
+            }
+            else
+            {
+                currentVolume = newVolume;
+            }
             
             UpdateWaterLevel();
             UpdateStatusLabel();

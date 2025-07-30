@@ -21,6 +21,7 @@ namespace WaterTracker
         private int currentVolume = 0;
         private int bottleNumber = 1; // 水瓶计数从1开始
         private const int MaxVolume = 3000;
+        private bool _allowClose = false;
         private Button? drinkButton;
         private Label? statusLabel;
 
@@ -123,9 +124,12 @@ namespace WaterTracker
         private void Form1_FormClosing(object? sender, FormClosingEventArgs e)
         {
             SaveData();
-            // 取消关闭并最小化到系统托盘
-            e.Cancel = true;
-            this.Hide();
+            if (!_allowClose)
+            {
+                // 取消关闭并最小化到系统托盘
+                e.Cancel = true;
+                this.Hide();
+            }
         }
 
         private void OpenWaterTracker_Click(object? sender, EventArgs e)
@@ -137,6 +141,7 @@ namespace WaterTracker
         private void ExitToolStripMenuItem_Click(object? sender, EventArgs e)
         {
             // 清理资源并退出程序
+            _allowClose = true;
             hourlyTimer?.Stop();
             hourlyTimer?.Dispose();
             notifyIcon?.Dispose();

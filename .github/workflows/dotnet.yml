@@ -24,5 +24,15 @@ jobs:
     - name: Build
       run: dotnet build WaterTracker.csproj --no-restore --configuration Release
 
-    - name: Output build result
-      run: echo Build completed successfully!
+    - name: Publish application
+      run: dotnet publish WaterTracker.csproj --configuration Release --output ./publish
+
+    - name: Zip release files
+      run: Compress-Archive -Path ./publish/* -DestinationPath ./WaterTracker.zip
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        name: WaterTracker Release ${{ github.sha }}
+        files: ./WaterTracker.zip
+        generate_release_notes: true

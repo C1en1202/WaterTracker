@@ -45,8 +45,7 @@ namespace WaterTracker
               notifyIcon = new NotifyIcon();
               try
               {
-                  LoadData();
-            InitializeUI();
+                  InitializeUI();
             UpdateDrinkButtonText();
             UpdateStatusLabel();
               }
@@ -57,28 +56,62 @@ namespace WaterTracker
               }
               // 移除图标设置
               
-              Load += Form1_Load;
+              Shown += Form1_Shown;
               FormClosing += Form1_FormClosing;
         }
 
         private void LoadData()
         {
-            if (File.Exists(savePath))
+            try
             {
-                try
+                if (File.Exists(savePath))
                 {
                     string json = File.ReadAllText(savePath);
-                    var data = JsonSerializer.Deserialize<WaterSaveData>(json);
-                    if (data != null)
+                    if (!string.IsNullOrEmpty(json) && json.Trim() != "{}")
                     {
-                        currentVolume = data.CurrentVolume;
-                    bottleNumber = data.BottleNumber > 0 ? data.BottleNumber : 1;
+                        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                        var data = JsonSerializer.Deserialize<WaterSaveData>(json, options);
+                        if (data != null)
+                        {
+                            currentVolume = data.CurrentVolume;
+                            bottleNumber = data.BottleNumber > 0 ? data.BottleNumber : 1;
+                            System.Diagnostics.Debug.WriteLine($"LoadData: Loaded currentVolume={currentVolume}, bottleNumber={bottleNumber}");
+                        }
+                        else
+                        {
+                            System.Diagnostics.Debug.WriteLine("LoadData: Deserialized data is null");
+                            currentVolume = 0; // 设置默认水量为0
+                            bottleNumber = 1;
+                        }
+                    }
+                    else
+                    {
+                        System.Diagnostics.Debug.WriteLine("LoadData: JSON file is empty or contains only {}");
+                        currentVolume = 0; // 设置默认水量为0
+                        bottleNumber = 1;
+                    }
                 }
-                UpdateStatusLabel();
-                UpdateDrinkButtonText();
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine("LoadData: Save file does not exist");
+                    currentVolume = 0; // 设置默认水量为0
+                    bottleNumber = 1;
                 }
-                catch {}
             }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"LoadData error: {ex.Message}");
+                // 出错时设置默认值
+                currentVolume = 0;
+                bottleNumber = 1;
+            }
+            
+            UpdateStatusLabel();
+            UpdateDrinkButtonText();
+            UpdateWaterLevel();
+            // 确保水位更新
+            BeginInvoke(new Action(UpdateWaterLevel));
+            System.Diagnostics.Debug.WriteLine("LoadData: Completed, calling UpdateWaterLevel");
         }
 
         private void DeleteSaveData()
@@ -93,6 +126,7 @@ namespace WaterTracker
                     UpdateWaterLevel();
                     UpdateStatusLabel();
                     UpdateDrinkButtonText();
+                    UpdateWaterLevel();
                     var statusLabel = this.Controls.OfType<Label>().First();
                     statusLabel.Text = $"当前水瓶: {bottleNumber} | 当前水量: {currentVolume}ml / {MaxVolume}ml";
                     MessageBox.Show("存档已删除");
@@ -118,7 +152,12 @@ namespace WaterTracker
                     BottleNumber = bottleNumber
                 };
                 string json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
-                File.WriteAllText(savePath, json);
+            string directory = Path.GetDirectoryName(savePath) ?? AppContext.BaseDirectory;
+            if (!Directory.Exists(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+            File.WriteAllText(savePath, json);
             }
             catch {}
         }
@@ -153,6 +192,7 @@ namespace WaterTracker
         private void HourlyTimer_Tick(object? sender, EventArgs e)
         {
             CheckAndSendNotification();
+            UpdateWaterLevel();
         }
 
         private void UpdateDrinkButtonText()
@@ -168,6 +208,9 @@ namespace WaterTracker
             if (statusLabel != null)
             {
                 statusLabel.Text = $"当前水瓶: {bottleNumber} | 当前水量: {currentVolume}ml / {MaxVolume}ml";
+                statusLabel.Location = new Point(0, 10);
+                statusLabel.Width = this.Width;
+                statusLabel.TextAlign = ContentAlignment.MiddleCenter;
             }
         }
 
@@ -219,18 +262,36 @@ namespace WaterTracker
             }
         }
 
-        private void Form1_Load(object? sender, EventArgs e)
+        private void Form1_Shown(object? sender, EventArgs e)
         {
-            UpdateWaterLevel();
+            LoadData();
+            // 确保UI完全加载后再更新水位
+            BeginInvoke(new Action(() =>
+            {
+                // 强制重新计算和更新水位
+                UpdateWaterLevel();
+                // 调试信息
+                System.Diagnostics.Debug.WriteLine("Form1_Shown: Updated water level");
+            }));
         }
 
         private void InitializeUI()
         {
             // 设置窗口属性
             this.Text = "DrinkWater";
-            this.Size = new Size(500, 700);
+            this.Size = new Size(600, 800); // 增大窗口大小
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
+
+            // 创建状态标签并置于窗口顶部居中
+            statusLabel = new Label
+            {
+                Parent = this,
+                Location = new Point(0, 10),
+                Width = this.Width,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Font = new Font("微软雅黑", 10)
+            };
 
             // 创建水瓶容器
             var bottleContainer = new Panel
@@ -333,6 +394,7 @@ namespace WaterTracker
             };
 
             this.PerformLayout();
+            UpdateWaterLevel();
 
             // 创建系统托盘菜单
             ContextMenuStrip contextMenu = new ContextMenuStrip();
@@ -360,6 +422,14 @@ namespace WaterTracker
               notifyIcon!.Icon = SystemIcons.Application;
               notifyIcon!.Text = "WaterTracker";
               notifyIcon!.ContextMenuStrip = contextMenu;
+              notifyIcon!.MouseClick += (s, e) =>
+              {
+                  if (e.Button == MouseButtons.Left)
+                  {
+                      this.Show();
+                      this.WindowState = FormWindowState.Normal;
+                  }
+              };
 
             // 初始化整点提醒定时器
             hourlyTimer = new WinFormsTimer
@@ -385,6 +455,7 @@ namespace WaterTracker
                 UpdateWaterLevel();
                 UpdateStatusLabel();
                 SaveData();
+                MessageBox.Show($"已切换到第{bottleNumber}个水瓶！");
                 return;
             }
 
@@ -408,18 +479,70 @@ namespace WaterTracker
 
         private void UpdateWaterLevel()
         {
+            System.Diagnostics.Debug.WriteLine("UpdateWaterLevel: Starting");
+            
+            if (waterPanel == null)
+            {
+                System.Diagnostics.Debug.WriteLine("UpdateWaterLevel: waterPanel is null");
+                // 尝试查找waterPanel
+                waterPanel = this.Controls.Find("waterPanel", true).FirstOrDefault() as Panel;
+                if (waterPanel == null)
+                {
+                    System.Diagnostics.Debug.WriteLine("UpdateWaterLevel: Could not find waterPanel");
+                    return;
+                }
+            }
+            
             if (waterPanel?.Parent is Panel bottleContainer)
             {
+                System.Diagnostics.Debug.WriteLine("UpdateWaterLevel: bottleContainer found");
+                
+                // 确保容器布局已更新
+                bottleContainer.PerformLayout();
+                
+                // 计算水位百分比
                 float percentage = (float)currentVolume / MaxVolume;
+                
+                // 获取容器高度
                 int containerHeight = bottleContainer.ClientSize.Height;
+                System.Diagnostics.Debug.WriteLine($"UpdateWaterLevel: containerHeight={containerHeight}");
+                
+                // 计算水面板高度
                 int waterHeight = (int)(percentage * containerHeight);
+                
+                // 当水量为0时，设置高度为0，否则确保有一个最小高度
+                waterHeight = currentVolume == 0 ? 0 : Math.Max(waterHeight, 5);
+                
+                // 确保水面板高度不会超过容器高度
+                waterHeight = Math.Min(waterHeight, containerHeight);
+                
+                // 设置水面板大小和位置
                 waterPanel.Size = new Size(bottleContainer.ClientSize.Width - 2, waterHeight);
-                waterPanel.Location = new Point(1, containerHeight - waterHeight);
+                waterPanel.Location = new Point(1, bottleContainer.ClientSize.Height - waterHeight);
+                
+                // 确保水面板可见
+                waterPanel.Visible = true;
+                waterPanel.BringToFront();
+                
+                // 刷新控件
                 waterPanel.Invalidate();
+                waterPanel.Refresh();
                 bottleContainer.Invalidate();
+                bottleContainer.Refresh();
+                
                 // 调试输出
                 System.Diagnostics.Debug.WriteLine($"UpdateWaterLevel: currentVolume={currentVolume}, percentage={percentage}, waterHeight={waterHeight}");
             }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine("UpdateWaterLevel: bottleContainer is null or not a Panel");
+                if (waterPanel?.Parent != null)
+                {
+                    System.Diagnostics.Debug.WriteLine($"UpdateWaterLevel: waterPanel.Parent type is {waterPanel.Parent.GetType().Name}");
+                }
+            }
+            
+            System.Diagnostics.Debug.WriteLine("UpdateWaterLevel: Completed");
         }
     }
 }

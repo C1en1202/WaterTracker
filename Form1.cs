@@ -38,6 +38,134 @@ namespace WaterTracker
             public int BottleNumber { get; set; }
         }
 
+        // 时间设置窗口
+        public class TimeForm : Form
+        {
+        private TextBox timeTextBox;
+        private System.Windows.Forms.Timer? reminderTimer;
+
+        public TimeForm()
+        {
+            this.Text = "Time";
+            this.Size = new Size(300, 150);
+            this.FormBorderStyle = FormBorderStyle.FixedDialog;
+            this.MaximizeBox = false;
+            this.MinimizeBox = false;
+            this.StartPosition = FormStartPosition.CenterParent;
+
+            // 创建标签
+            var label = new Label
+            {
+                Parent = this,
+                Text = "请设置提醒时间:",
+                Location = new Point(20, 20),
+                Font = new Font("微软雅黑", 10)
+            };
+
+            // 创建时间输入框
+            timeTextBox = new TextBox
+            {
+                Parent = this,
+                Size = new Size(100, 25),
+                Location = new Point(140, 20),
+                Font = new Font("微软雅黑", 10),
+                Text = "输入格式:11:30",
+                ForeColor = Color.Gray
+            };
+            timeTextBox.Enter += (s, e) =>
+            {
+                if (timeTextBox.Text == "输入格式:11:30")
+                {
+                    timeTextBox.Text = "";
+                    timeTextBox.ForeColor = Color.Black;
+                }
+            };
+            timeTextBox.Leave += (s, e) =>
+            {
+                if (string.IsNullOrWhiteSpace(timeTextBox.Text))
+                {
+                    timeTextBox.Text = "输入格式:11:30";
+                    timeTextBox.ForeColor = Color.Gray;
+                }
+            };
+            timeTextBox.KeyPress += (s, e) =>
+            {
+                if (e.KeyChar == (char)Keys.Enter)
+                {
+                    SetReminder();
+                }
+            };
+
+            // 创建确认按钮
+            var confirmButton = new Button
+            {
+                Parent = this,
+                Text = "确认",
+                Size = new Size(80, 30),
+                Location = new Point((this.Width - 80) / 2, 60),
+                Font = new Font("微软雅黑", 10)
+            };
+            confirmButton.Click += (s, e) => SetReminder();
+        }
+
+        private void SetReminder()
+        {
+            string timeText = timeTextBox.Text.Trim();
+            if (!System.Text.RegularExpressions.Regex.IsMatch(timeText, @"^([01]?[0-9]|2[0-3]):[0-5][0-9]$"))
+            {
+                MessageBox.Show("时间格式不正确，请使用HH:mm格式");
+                return;
+            }
+
+            try
+            {
+                // 解析时间
+                string[] parts = timeText.Split(':');
+                int hour = int.Parse(parts[0]);
+                int minute = int.Parse(parts[1]);
+
+                // 设置提醒定时器
+                reminderTimer = new System.Windows.Forms.Timer
+                {
+                    Interval = 60000 // 每分钟检查一次
+                };
+                reminderTimer.Tick += (s, e) => CheckCustomReminder(hour, minute);
+                reminderTimer.Start();
+
+                MessageBox.Show("已设置在" + hour + ":" + minute + "提醒喝水");
+                this.Close();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("设置提醒失败: " + ex.Message);
+            }
+        }
+
+        private void CheckCustomReminder(int targetHour, int targetMinute)
+        {
+            DateTime now = DateTime.Now;
+            if (now.Hour == targetHour && now.Minute == targetMinute && now.Second < 10)
+            {
+                // 停止定时器
+                reminderTimer?.Stop();
+                reminderTimer?.Dispose();
+
+                // 计算累计喝水量
+                Form1? mainForm = Application.OpenForms["Form1"] as Form1;
+                if (mainForm != null)
+                {
+                    int totalVolume = (mainForm.bottleNumber - 1) * Form1.MaxVolume + mainForm.currentVolume;
+
+                    // 发送系统通知
+                    mainForm.notifyIcon?.ShowBalloonTip(15000,
+                        "喝水提醒",
+                        $"到{targetHour}:{targetMinute}啦,请喝水!\n本存档已记录喝水量{totalVolume}ml",
+                        ToolTipIcon.Info);
+                }
+            }
+        }
+    }
+
         public Form1()
         {
             InitializeComponent();
@@ -45,7 +173,8 @@ namespace WaterTracker
               notifyIcon = new NotifyIcon();
               try
               {
-                  InitializeUI();
+                  LoadData();
+            InitializeUI();
             UpdateDrinkButtonText();
             UpdateStatusLabel();
               }
@@ -55,63 +184,29 @@ namespace WaterTracker
                   Application.Exit();
               }
               // 移除图标设置
-              
-              Shown += Form1_Shown;
+
+              Load += Form1_Load;
               FormClosing += Form1_FormClosing;
         }
 
         private void LoadData()
         {
-            try
+            if (File.Exists(savePath))
             {
-                if (File.Exists(savePath))
+                try
                 {
                     string json = File.ReadAllText(savePath);
-                    if (!string.IsNullOrEmpty(json) && json.Trim() != "{}")
+                    var data = JsonSerializer.Deserialize<WaterSaveData>(json);
+                    if (data != null)
                     {
-                        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-                        var data = JsonSerializer.Deserialize<WaterSaveData>(json, options);
-                        if (data != null)
-                        {
-                            currentVolume = data.CurrentVolume;
-                            bottleNumber = data.BottleNumber > 0 ? data.BottleNumber : 1;
-                            System.Diagnostics.Debug.WriteLine($"LoadData: Loaded currentVolume={currentVolume}, bottleNumber={bottleNumber}");
-                        }
-                        else
-                        {
-                            System.Diagnostics.Debug.WriteLine("LoadData: Deserialized data is null");
-                            currentVolume = 0; // 设置默认水量为0
-                            bottleNumber = 1;
-                        }
-                    }
-                    else
-                    {
-                        System.Diagnostics.Debug.WriteLine("LoadData: JSON file is empty or contains only {}");
-                        currentVolume = 0; // 设置默认水量为0
-                        bottleNumber = 1;
-                    }
+                        currentVolume = data.CurrentVolume;
+                    bottleNumber = data.BottleNumber > 0 ? data.BottleNumber : 1;
                 }
-                else
-                {
-                    System.Diagnostics.Debug.WriteLine("LoadData: Save file does not exist");
-                    currentVolume = 0; // 设置默认水量为0
-                    bottleNumber = 1;
+                UpdateStatusLabel();
+                UpdateDrinkButtonText();
                 }
+                catch {}
             }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"LoadData error: {ex.Message}");
-                // 出错时设置默认值
-                currentVolume = 0;
-                bottleNumber = 1;
-            }
-            
-            UpdateStatusLabel();
-            UpdateDrinkButtonText();
-            UpdateWaterLevel();
-            // 确保水位更新
-            BeginInvoke(new Action(UpdateWaterLevel));
-            System.Diagnostics.Debug.WriteLine("LoadData: Completed, calling UpdateWaterLevel");
         }
 
         private void DeleteSaveData()
@@ -126,7 +221,6 @@ namespace WaterTracker
                     UpdateWaterLevel();
                     UpdateStatusLabel();
                     UpdateDrinkButtonText();
-                    UpdateWaterLevel();
                     var statusLabel = this.Controls.OfType<Label>().First();
                     statusLabel.Text = $"当前水瓶: {bottleNumber} | 当前水量: {currentVolume}ml / {MaxVolume}ml";
                     MessageBox.Show("存档已删除");
@@ -152,12 +246,7 @@ namespace WaterTracker
                     BottleNumber = bottleNumber
                 };
                 string json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
-            string directory = Path.GetDirectoryName(savePath) ?? AppContext.BaseDirectory;
-            if (!Directory.Exists(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-            File.WriteAllText(savePath, json);
+                File.WriteAllText(savePath, json);
             }
             catch {}
         }
@@ -177,6 +266,8 @@ namespace WaterTracker
         {
             this.Show();
             this.WindowState = FormWindowState.Normal;
+            this.BringToFront();
+            this.Activate();
         }
 
         private void ExitToolStripMenuItem_Click(object? sender, EventArgs e)
@@ -192,7 +283,6 @@ namespace WaterTracker
         private void HourlyTimer_Tick(object? sender, EventArgs e)
         {
             CheckAndSendNotification();
-            UpdateWaterLevel();
         }
 
         private void UpdateDrinkButtonText()
@@ -208,9 +298,6 @@ namespace WaterTracker
             if (statusLabel != null)
             {
                 statusLabel.Text = $"当前水瓶: {bottleNumber} | 当前水量: {currentVolume}ml / {MaxVolume}ml";
-                statusLabel.Location = new Point(0, 10);
-                statusLabel.Width = this.Width;
-                statusLabel.TextAlign = ContentAlignment.MiddleCenter;
             }
         }
 
@@ -229,7 +316,7 @@ namespace WaterTracker
             using (RegistryKey? key = Registry.CurrentUser.OpenSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Run", true))
             {
                 if (key == null) return;
-                
+
                 if (IsStartupEnabled())
                 {
                     key!.DeleteValue("WaterTracker");
@@ -254,44 +341,29 @@ namespace WaterTracker
             // 检查是否为整点
             if (DateTime.Now.Minute == 0 && DateTime.Now.Second < 10)
             {
+                // 计算累计喝水量
+                int totalVolume = (bottleNumber - 1) * MaxVolume + currentVolume;
+                
                 // 发送系统通知
                 notifyIcon?.ShowBalloonTip(15000,
                     "喝水提醒",
-                    $"到{DateTime.Now.Hour}点啦,请喝水!",
+                    $"到{DateTime.Now.Hour}点啦,请喝水!\n本存档已记录喝水量{totalVolume}ml",
                     ToolTipIcon.Info);
             }
         }
 
-        private void Form1_Shown(object? sender, EventArgs e)
+        private void Form1_Load(object? sender, EventArgs e)
         {
-            LoadData();
-            // 确保UI完全加载后再更新水位
-            BeginInvoke(new Action(() =>
-            {
-                // 强制重新计算和更新水位
-                UpdateWaterLevel();
-                // 调试信息
-                System.Diagnostics.Debug.WriteLine("Form1_Shown: Updated water level");
-            }));
+            UpdateWaterLevel();
         }
 
         private void InitializeUI()
         {
             // 设置窗口属性
             this.Text = "DrinkWater";
-            this.Size = new Size(600, 800); // 增大窗口大小
+            this.Size = new Size(500, 700);
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
-
-            // 创建状态标签并置于窗口顶部居中
-            statusLabel = new Label
-            {
-                Parent = this,
-                Location = new Point(0, 10),
-                Width = this.Width,
-                TextAlign = ContentAlignment.MiddleCenter,
-                Font = new Font("微软雅黑", 10)
-            };
 
             // 创建水瓶容器
             var bottleContainer = new Panel
@@ -394,7 +466,29 @@ namespace WaterTracker
             };
 
             this.PerformLayout();
-            UpdateWaterLevel();
+
+            // 创建第三行容器
+            var thirdRowPanel = new Panel
+            {
+                Parent = this,
+                Size = new Size(300, 40),
+                Location = new Point((this.Width - 300) / 2, 600)
+            };
+
+            // 创建提醒喝水按钮
+            var remindButton = new Button
+            {
+                Parent = thirdRowPanel,
+                Text = "请提醒我喝水",
+                Size = new Size(150, 35),
+                Location = new Point((thirdRowPanel.Width - 150) / 2, 0),
+                Font = new Font("微软雅黑", 10)
+            };
+            remindButton.Click += (s, e) =>
+            {
+                var timeForm = new TimeForm();
+                timeForm.ShowDialog();
+            };
 
             // 创建系统托盘菜单
             ContextMenuStrip contextMenu = new ContextMenuStrip();
@@ -422,14 +516,7 @@ namespace WaterTracker
               notifyIcon!.Icon = SystemIcons.Application;
               notifyIcon!.Text = "WaterTracker";
               notifyIcon!.ContextMenuStrip = contextMenu;
-              notifyIcon!.MouseClick += (s, e) =>
-              {
-                  if (e.Button == MouseButtons.Left)
-                  {
-                      this.Show();
-                      this.WindowState = FormWindowState.Normal;
-                  }
-              };
+              notifyIcon!.MouseClick += NotifyIcon_MouseClick;
 
             // 初始化整点提醒定时器
             hourlyTimer = new WinFormsTimer
@@ -455,7 +542,6 @@ namespace WaterTracker
                 UpdateWaterLevel();
                 UpdateStatusLabel();
                 SaveData();
-                MessageBox.Show($"已切换到第{bottleNumber}个水瓶！");
                 return;
             }
 
@@ -470,79 +556,35 @@ namespace WaterTracker
             {
                 currentVolume = newVolume;
             }
-            
+
             UpdateWaterLevel();
             UpdateStatusLabel();
             UpdateDrinkButtonText();
             SaveData();
         }
 
+        private void NotifyIcon_MouseClick(object? sender, MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Left)
+            {
+                OpenWaterTracker_Click(sender, e);
+            }
+        }
+
         private void UpdateWaterLevel()
         {
-            System.Diagnostics.Debug.WriteLine("UpdateWaterLevel: Starting");
-            
-            if (waterPanel == null)
-            {
-                System.Diagnostics.Debug.WriteLine("UpdateWaterLevel: waterPanel is null");
-                // 尝试查找waterPanel
-                waterPanel = this.Controls.Find("waterPanel", true).FirstOrDefault() as Panel;
-                if (waterPanel == null)
-                {
-                    System.Diagnostics.Debug.WriteLine("UpdateWaterLevel: Could not find waterPanel");
-                    return;
-                }
-            }
-            
             if (waterPanel?.Parent is Panel bottleContainer)
             {
-                System.Diagnostics.Debug.WriteLine("UpdateWaterLevel: bottleContainer found");
-                
-                // 确保容器布局已更新
-                bottleContainer.PerformLayout();
-                
-                // 计算水位百分比
                 float percentage = (float)currentVolume / MaxVolume;
-                
-                // 获取容器高度
                 int containerHeight = bottleContainer.ClientSize.Height;
-                System.Diagnostics.Debug.WriteLine($"UpdateWaterLevel: containerHeight={containerHeight}");
-                
-                // 计算水面板高度
                 int waterHeight = (int)(percentage * containerHeight);
-                
-                // 当水量为0时，设置高度为0，否则确保有一个最小高度
-                waterHeight = currentVolume == 0 ? 0 : Math.Max(waterHeight, 5);
-                
-                // 确保水面板高度不会超过容器高度
-                waterHeight = Math.Min(waterHeight, containerHeight);
-                
-                // 设置水面板大小和位置
                 waterPanel.Size = new Size(bottleContainer.ClientSize.Width - 2, waterHeight);
-                waterPanel.Location = new Point(1, bottleContainer.ClientSize.Height - waterHeight);
-                
-                // 确保水面板可见
-                waterPanel.Visible = true;
-                waterPanel.BringToFront();
-                
-                // 刷新控件
+                waterPanel.Location = new Point(1, containerHeight - waterHeight);
                 waterPanel.Invalidate();
-                waterPanel.Refresh();
                 bottleContainer.Invalidate();
-                bottleContainer.Refresh();
-                
                 // 调试输出
                 System.Diagnostics.Debug.WriteLine($"UpdateWaterLevel: currentVolume={currentVolume}, percentage={percentage}, waterHeight={waterHeight}");
             }
-            else
-            {
-                System.Diagnostics.Debug.WriteLine("UpdateWaterLevel: bottleContainer is null or not a Panel");
-                if (waterPanel?.Parent != null)
-                {
-                    System.Diagnostics.Debug.WriteLine($"UpdateWaterLevel: waterPanel.Parent type is {waterPanel.Parent.GetType().Name}");
-                }
-            }
-            
-            System.Diagnostics.Debug.WriteLine("UpdateWaterLevel: Completed");
         }
     }
 }

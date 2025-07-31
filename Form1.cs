@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
 using System.Drawing;
+using System.Drawing.Text;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -43,9 +44,37 @@ namespace WaterTracker
         {
         private TextBox timeTextBox;
         private System.Windows.Forms.Timer? reminderTimer;
+        private Font customFont;
 
         public TimeForm()
         {
+            // 加载自定义字体
+            try
+            {
+                string fontPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ttf", "ttf.ttf");
+                if (File.Exists(fontPath))
+                {
+                    PrivateFontCollection fontCollection = new PrivateFontCollection();
+                    fontCollection.AddFontFile(fontPath);
+                    if (fontCollection.Families.Length > 0)
+                    {
+                        customFont = new Font(fontCollection.Families[0], 10, FontStyle.Regular);
+                    }
+                    else
+                    {
+                        customFont = new Font("微软雅黑", 10, FontStyle.Regular);
+                    }
+                }
+                else
+                {
+                    customFont = new Font("微软雅黑", 10, FontStyle.Regular);
+                }
+            }
+            catch
+            {
+                customFont = new Font("微软雅黑", 10, FontStyle.Regular);
+            }
+            
             this.Text = "Time";
             this.Size = new Size(300, 150);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -59,7 +88,7 @@ namespace WaterTracker
                 Parent = this,
                 Text = "请设置提醒时间:",
                 Location = new Point(20, 20),
-                Font = new Font("微软雅黑", 10)
+                Font = customFont
             };
 
             // 创建时间输入框
@@ -68,7 +97,7 @@ namespace WaterTracker
                 Parent = this,
                 Size = new Size(100, 25),
                 Location = new Point(140, 20),
-                Font = new Font("微软雅黑", 10),
+                Font = customFont,
                 Text = "输入格式:14:30", // 24小时制示例
                 ForeColor = Color.Gray
             };
@@ -103,7 +132,7 @@ namespace WaterTracker
                 Text = "确认",
                 Size = new Size(80, 30),
                 Location = new Point((this.Width - 80) / 2, 60),
-                Font = new Font("微软雅黑", 10)
+                Font = customFont
             };
             confirmButton.Click += (s, e) => SetReminder();
         }
@@ -146,9 +175,8 @@ namespace WaterTracker
             DateTime now = DateTime.Now;
             if (now.Hour == targetHour && now.Minute == targetMinute && now.Second < 10)
             {
-                // 停止定时器
-                reminderTimer?.Stop();
-                reminderTimer?.Dispose();
+                // 不需要停止定时器，让它继续每分钟检查一次
+                // 这样可以实现每天同一时间提醒
 
                 // 计算累计喝水量
                 Form1? mainForm = Application.OpenForms["Form1"] as Form1;
@@ -360,8 +388,38 @@ namespace WaterTracker
             UpdateWaterLevel();
         }
 
+        private System.Windows.Forms.Timer? reminderTimer;
+
         private void InitializeUI()
         {
+            // 加载自定义字体
+            Font customFont = null;
+            try
+            {
+                string fontPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ttf", "ttf.ttf");
+                if (File.Exists(fontPath))
+                {
+                    PrivateFontCollection fontCollection = new PrivateFontCollection();
+                    fontCollection.AddFontFile(fontPath);
+                    if (fontCollection.Families.Length > 0)
+                    {
+                        customFont = new Font(fontCollection.Families[0], 10, FontStyle.Regular);
+                    }
+                    else
+                    {
+                        customFont = new Font("微软雅黑", 10, FontStyle.Regular);
+                    }
+                }
+                else
+                {
+                    customFont = new Font("微软雅黑", 10, FontStyle.Regular);
+                }
+            }
+            catch
+            {
+                customFont = new Font("微软雅黑", 10, FontStyle.Regular);
+            }
+
             // 设置窗口属性
             this.Text = "DrinkWater";
             this.Size = new Size(500, 700);
@@ -404,7 +462,7 @@ namespace WaterTracker
                 Text = "300",
                 Size = new Size(80, 35),
                 Location = new Point(0, 0),
-                Font = new Font("微软雅黑", 10)
+                Font = customFont
             };
 
             // 创建喝水按钮
@@ -414,7 +472,7 @@ namespace WaterTracker
                 Text = "喝一次水",
                 Size = new Size(120, 35),
                 Location = new Point(180, 0),
-                Font = new Font("微软雅黑", 10, FontStyle.Bold)
+                Font = new Font(customFont.FontFamily, 10, FontStyle.Bold)
             };
             drinkButton.Click += (s, e) =>
             {
@@ -442,7 +500,7 @@ namespace WaterTracker
                 Text = "删除存档",
                 Size = new Size(140, 35),
                 Location = new Point(0, 0),
-                Font = new Font("微软雅黑", 10)
+                Font = customFont
             };
             deleteSaveButton.Click += (s, e) => DeleteSaveData();
 
@@ -453,7 +511,7 @@ namespace WaterTracker
                 Text = IsStartupEnabled() ? "禁用开机自启" : "启用开机自启",
                 Size = new Size(140, 35),
                 Location = new Point(160, 0),
-                Font = new Font("微软雅黑", 10)
+                Font = customFont
             };
             startupButton.Click += (s, e) => ToggleStartup();
 
@@ -465,10 +523,18 @@ namespace WaterTracker
                 Size = new Size(300, 20),
                 Location = new Point(50, 20),
                 TextAlign = ContentAlignment.MiddleCenter,
-                Font = new Font("微软雅黑", 10)
+                Font = customFont
             };
 
             this.PerformLayout();
+
+            // 初始化整点提醒定时器
+            hourlyTimer = new System.Windows.Forms.Timer
+            {
+                Interval = 60000 // 每分钟检查一次
+            };
+            hourlyTimer.Tick += HourlyTimer_Tick;
+            hourlyTimer.Start();
 
             // 创建第三行容器
             var thirdRowPanel = new Panel
@@ -485,7 +551,7 @@ namespace WaterTracker
                 Text = "请提醒我喝水",
                 Size = new Size(150, 35),
                 Location = new Point((thirdRowPanel.Width - 150) / 2, 0),
-                Font = new Font("微软雅黑", 10)
+                Font = customFont
             };
             remindButton.Click += (s, e) =>
             {

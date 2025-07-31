@@ -69,7 +69,7 @@ namespace WaterTracker
                 Size = new Size(100, 25),
                 Location = new Point(140, 20),
                 Font = new Font("微软雅黑", 10),
-                Text = "输入格式:11:30",
+                Text = "输入格式:14:30", // 24小时制示例
                 ForeColor = Color.Gray
             };
             timeTextBox.Enter += (s, e) =>
@@ -113,7 +113,7 @@ namespace WaterTracker
             string timeText = timeTextBox.Text.Trim();
             if (!System.Text.RegularExpressions.Regex.IsMatch(timeText, @"^([01]?[0-9]|2[0-3]):[0-5][0-9]$"))
             {
-                MessageBox.Show("时间格式不正确，请使用HH:mm格式");
+                MessageBox.Show("时间格式不正确，请使用24小时制HH:mm格式");
                 return;
             }
 
@@ -171,6 +171,9 @@ namespace WaterTracker
             InitializeComponent();
               this.Icon = null;
               notifyIcon = new NotifyIcon();
+              // 设置通知图标
+              notifyIcon.Icon = SystemIcons.Application;
+              notifyIcon.Visible = true;
               try
               {
                   LoadData();

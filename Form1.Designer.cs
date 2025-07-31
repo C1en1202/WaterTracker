@@ -1,4 +1,4 @@
-﻿namespace WaterTracker;
+namespace WaterTracker;
 
 partial class Form1
 {

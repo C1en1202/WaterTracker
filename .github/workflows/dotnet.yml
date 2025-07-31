@@ -3,6 +3,8 @@ name: Build WaterTracker
 on:
   push:
     branches: [ main ]
+    tags:
+      - 'v*'
   pull_request:
     branches: [ main ]
 
@@ -31,8 +33,9 @@ jobs:
       run: Compress-Archive -Path ./publish/* -DestinationPath ./WaterTracker.zip
 
     - name: Create GitHub Release
+      if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v1
       with:
-        name: WaterTracker Release ${{ github.sha }}
+        name: WaterTracker Release ${{ github.ref_name }}
         files: ./WaterTracker.zip
         generate_release_notes: true
